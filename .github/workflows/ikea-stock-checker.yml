@@ -57,27 +57,27 @@ jobs:
           
           # Create message based on stock status
           if [ "${{ steps.stock-check.outputs.alert_level }}" = "IN_STOCK" ]; then
-            message="🎉 *IKEA ITEM IN STOCK!* 🎉%0A%0A"
-            message="${message}📦 *Product Code:* 40573285%0A"
-            message="${message}🏪 *Store Code:* 331%0A" 
-            message="${message}📊 *Status:* ${{ steps.stock-check.outputs.status }}%0A"
-            message="${message}🕐 *Checked:* ${timestamp}%0A%0A"
-            message="${message}🔗 *Quick Link:* https://www.ikea.com.tr/%0A%0A"
-            message="${message}⚡ *Action Required:* Check website and order now!"
+            message="🎉 *IKEA ÜRÜNÜ STOKTA!* 🎉%0A%0A"
+            message="${message}📦 *Ürün Kodu:* 40573285%0A"
+            message="${message}🏪 *Mağaza Kodu:* 331%0A" 
+            message="${message}📊 *Durum:* ${{ steps.stock-check.outputs.status }}%0A"
+            message="${message}🕐 *Kontrol Zamanı:* ${timestamp}%0A%0A"
+            message="${message}🔗 *Hızlı Link:* https://www.ikea.com.tr/%0A%0A"
+            message="${message}⚡ *Acil Eylem:* Web sitesini kontrol et ve hemen sipariş ver!"
           elif [ "${{ steps.stock-check.outputs.alert_level }}" = "OUT_OF_STOCK" ]; then
-            message="❌ *IKEA Stock Check* ❌%0A%0A"
-            message="${message}📦 *Product Code:* 40573285%0A"
-            message="${message}🏪 *Store Code:* 331%0A"
-            message="${message}📊 *Status:* Still out of stock%0A"
-            message="${message}🕐 *Checked:* ${timestamp}%0A%0A"
-            message="${message}💡 *Tip:* I'll check again tomorrow!"
+            message="❌ *IKEA Stok Kontrolü* ❌%0A%0A"
+            message="${message}📦 *Ürün Kodu:* 40573285%0A"
+            message="${message}🏪 *Mağaza Kodu:* 331%0A"
+            message="${message}📊 *Durum:* Hala stokta yok%0A"
+            message="${message}🕐 *Kontrol Zamanı:* ${timestamp}%0A%0A"
+            message="${message}💡 *İpucu:* Yarın tekrar kontrol edeceğim!"
           else
-            message="⚠️ *IKEA Stock Check - Issue* ⚠️%0A%0A"
-            message="${message}📦 *Product Code:* 40573285%0A"
-            message="${message}🏪 *Store Code:* 331%0A"
-            message="${message}📊 *Status:* ${{ steps.stock-check.outputs.status }}%0A"
-            message="${message}🕐 *Checked:* ${timestamp}%0A%0A"
-            message="${message}🔍 *Note:* Unexpected response - please check manually"
+            message="⚠️ *IKEA Stok Kontrolü - Sorun* ⚠️%0A%0A"
+            message="${message}📦 *Ürün Kodu:* 40573285%0A"
+            message="${message}🏪 *Mağaza Kodu:* 331%0A"
+            message="${message}📊 *Durum:* ${{ steps.stock-check.outputs.status }}%0A"
+            message="${message}🕐 *Kontrol Zamanı:* ${timestamp}%0A%0A"
+            message="${message}🔍 *Not:* Beklenmeyen yanıt - manuel kontrol edin"
           fi
           
           # Send to Telegram
