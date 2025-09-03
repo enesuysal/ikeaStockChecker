@@ -13,40 +13,56 @@ jobs:
       - name: Check IKEA Stock
         id: stock-check
         run: |
-          # Call IKEA API
+          # Call IKEA API to get all store stocks
           response=$(curl -s -X POST \
-            "https://www.ikea.com.tr/en/_ws/general.aspx/CheckStock" \
+            "https://www.ikea.com.tr/_ws/general.aspx/CheckStoreStocks" \
             -H "Content-Type: application/json" \
             -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
             -d '{
-              "stockCode": "40573285",
-              "storeCode": "331"
+              "sprCode": 40573285
             }')
           
           echo "API Response: $response"
           
-          # Extract status using jq
-          status=$(echo "$response" | jq -r '.d.Data.Status // "Unknown"')
-          stock_text=$(echo "$response" | jq -r '.d.Data.StockText // "No info"')
+          # Extract store information using jq
+          stores_in_stock=$(echo "$response" | jq -r '.d.Data.StatusList[] | select(.Status == 2 and .StoreType == 1) | .StoreTitle' | tr '\n' ',' | sed 's/,$//')
+          stores_out_of_stock=$(echo "$response" | jq -r '.d.Data.StatusList[] | select(.Status == 0 and .StoreType == 1) | .StoreTitle' | tr '\n' ',' | sed 's/,$//')
+          online_status=$(echo "$response" | jq -r '.d.Data.StatusList[] | select(.StoreTitle == "İNTERNET MAĞAZASI") | .StockText')
           
-          echo "Stock Status: $status"
-          echo "Stock Text: $stock_text"
+          # Count stores
+          in_stock_count=$(echo "$stores_in_stock" | grep -o ',' | wc -l)
+          if [ ! -z "$stores_in_stock" ]; then
+            in_stock_count=$((in_stock_count + 1))
+          else
+            in_stock_count=0
+          fi
+          
+          out_stock_count=$(echo "$stores_out_of_stock" | grep -o ',' | wc -l)
+          if [ ! -z "$stores_out_of_stock" ]; then
+            out_stock_count=$((out_stock_count + 1))
+          else
+            out_stock_count=0
+          fi
+          
+          echo "Stores in stock: $stores_in_stock"
+          echo "Stores out of stock: $stores_out_of_stock"
+          echo "Online status: $online_status"
+          echo "In stock count: $in_stock_count"
+          echo "Out of stock count: $out_stock_count"
           
           # Set outputs for next step
-          echo "status=$status" >> $GITHUB_OUTPUT
-          echo "stock_text=$stock_text" >> $GITHUB_OUTPUT
+          echo "stores_in_stock=$stores_in_stock" >> $GITHUB_OUTPUT
+          echo "stores_out_of_stock=$stores_out_of_stock" >> $GITHUB_OUTPUT
+          echo "online_status=$online_status" >> $GITHUB_OUTPUT
+          echo "in_stock_count=$in_stock_count" >> $GITHUB_OUTPUT
+          echo "out_stock_count=$out_stock_count" >> $GITHUB_OUTPUT
           echo "full_response=$response" >> $GITHUB_OUTPUT
           
-          # Determine emoji and message
-          if [ "$status" = "InStock" ] || [ "$status" = "LowStock" ]; then
-            echo "emoji=🟢" >> $GITHUB_OUTPUT
+          # Determine alert level
+          if [ "$in_stock_count" -gt 0 ]; then
             echo "alert_level=IN_STOCK" >> $GITHUB_OUTPUT
-          elif [ "$status" = "NoStock" ]; then
-            echo "emoji=🔴" >> $GITHUB_OUTPUT  
-            echo "alert_level=OUT_OF_STOCK" >> $GITHUB_OUTPUT
           else
-            echo "emoji=🟡" >> $GITHUB_OUTPUT
-            echo "alert_level=UNKNOWN" >> $GITHUB_OUTPUT
+            echo "alert_level=OUT_OF_STOCK" >> $GITHUB_OUTPUT
           fi
 
       - name: Send Telegram Notification
@@ -59,25 +75,38 @@ jobs:
           if [ "${{ steps.stock-check.outputs.alert_level }}" = "IN_STOCK" ]; then
             message="🎉 *IKEA ÜRÜNÜ STOKTA!* 🎉%0A%0A"
             message="${message}📦 *Ürün Kodu:* 40573285%0A"
-            message="${message}🏪 *Mağaza Kodu:* 331%0A" 
-            message="${message}📊 *Durum:* ${{ steps.stock-check.outputs.status }}%0A"
+            message="${message}📊 *Online Durum:* ${{ steps.stock-check.outputs.online_status }}%0A"
             message="${message}🕐 *Kontrol Zamanı:* ${timestamp}%0A%0A"
-            message="${message}🔗 *Hızlı Link:* https://www.ikea.com.tr/%0A%0A"
-            message="${message}⚡ *Acil Eylem:* Web sitesini kontrol et ve hemen sipariş ver!"
-          elif [ "${{ steps.stock-check.outputs.alert_level }}" = "OUT_OF_STOCK" ]; then
-            message="❌ *IKEA Stok Kontrolü* ❌%0A%0A"
-            message="${message}📦 *Ürün Kodu:* 40573285%0A"
-            message="${message}🏪 *Mağaza Kodu:* 331%0A"
-            message="${message}📊 *Durum:* Hala stokta yok%0A"
-            message="${message}🕐 *Kontrol Zamanı:* ${timestamp}%0A%0A"
-            message="${message}💡 *İpucu:* Yarın tekrar kontrol edeceğim!"
+            
+            # Add available stores
+            if [ ! -z "${{ steps.stock-check.outputs.stores_in_stock }}" ]; then
+              message="${message}� *Stokta Olan Mağazalar (${{ steps.stock-check.outputs.in_stock_count }}):*%0A"
+              IFS=',' read -ra STORES <<< "${{ steps.stock-check.outputs.stores_in_stock }}"
+              for store in "${STORES[@]}"; do
+                message="${message}   ✅ $store%0A"
+              done
+              message="${message}%0A"
+            fi
+            
+            # Add out of stock stores
+            if [ ! -z "${{ steps.stock-check.outputs.stores_out_of_stock }}" ]; then
+              message="${message}🔴 *Stokta Olmayan Mağazalar (${{ steps.stock-check.outputs.out_stock_count }}):*%0A"
+              IFS=',' read -ra STORES <<< "${{ steps.stock-check.outputs.stores_out_of_stock }}"
+              for store in "${STORES[@]}"; do
+                message="${message}   ❌ $store%0A"
+              done
+              message="${message}%0A"
+            fi
+            
+            message="${message}� *Hızlı Link:* https://www.ikea.com.tr/%0A%0A"
+            message="${message}⚡ *Acil Eylem:* Stokta olan mağazalardan sipariş ver!"
           else
-            message="⚠️ *IKEA Stok Kontrolü - Sorun* ⚠️%0A%0A"
+            message="😞 *IKEA Stok Kontrolü* 😞%0A%0A"
             message="${message}📦 *Ürün Kodu:* 40573285%0A"
-            message="${message}🏪 *Mağaza Kodu:* 331%0A"
-            message="${message}📊 *Durum:* ${{ steps.stock-check.outputs.status }}%0A"
+            message="${message}📊 *Online Durum:* ${{ steps.stock-check.outputs.online_status }}%0A"
             message="${message}🕐 *Kontrol Zamanı:* ${timestamp}%0A%0A"
-            message="${message}🔍 *Not:* Beklenmeyen yanıt - manuel kontrol edin"
+            message="${message}� *Hiçbir mağazada stok yok*%0A%0A"
+            message="${message}💡 *İpucu:* Yarın tekrar kontrol edeceğim!"
           fi
           
           # Send to Telegram
@@ -91,8 +120,11 @@ jobs:
         if: always()
         run: |
           echo "=== IKEA Stock Check Results ==="
-          echo "Status: ${{ steps.stock-check.outputs.status }}"
+          echo "Stores in stock: ${{ steps.stock-check.outputs.stores_in_stock }}"
+          echo "Stores out of stock: ${{ steps.stock-check.outputs.stores_out_of_stock }}"
+          echo "Online status: ${{ steps.stock-check.outputs.online_status }}"
+          echo "In stock count: ${{ steps.stock-check.outputs.in_stock_count }}"
+          echo "Out of stock count: ${{ steps.stock-check.outputs.out_stock_count }}"
           echo "Alert Level: ${{ steps.stock-check.outputs.alert_level }}"
-          echo "Stock Text: ${{ steps.stock-check.outputs.stock_text }}"
           echo "Timestamp: $(date)"
           echo "Full API Response: ${{ steps.stock-check.outputs.full_response }}"
