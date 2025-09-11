@@ -29,7 +29,6 @@ jobs:
               -d "{\"sprCode\": $product}")
             
             echo "API Response for $product: $response"
-          
             
             # Extract store information using jq for this product
             stores_in_stock=$(echo "$response" | jq -r '.d.Data.StatusList[] | select(.Status == 2 and .StoreType == 1) | .StoreTitle' | tr '\n' ',' | sed 's/,$//')
@@ -98,43 +97,12 @@ jobs:
             message="🎉 *IKEA STOK KONTROL SONUÇLARI* 🎉%0A%0A"
             message="${message}🕐 *Kontrol Zamanı:* ${timestamp}%0A%0A"
             message="${message}${{ steps.stock-check.outputs.all_messages }}%0A%0A"
+            message="${message}🔗 *Hızlı Link:* https://www.ikea.com.tr/%0A%0A"
+            message="${message}⚡ *Acil Eylem:* Stokta olan mağazalardan sipariş ver!"
           else
             message="😞 *IKEA STOK KONTROL SONUÇLARI* 😞%0A%0A"
             message="${message}🕐 *Kontrol Zamanı:* ${timestamp}%0A%0A"
             message="${message}${{ steps.stock-check.outputs.all_messages }}%0A%0A"
-            message="${message}💡 *İpucu:* Yarın tekrar kontrol edeceğim!"
-          fi
-            message="🎉 *IKEA ÜRÜNÜ STOKTA!* 🎉%0A%0A"
-            message="${message}📦 *Ürün Kodu:* 40573285%0A"
-            message="${message}📊 *Online Durum:* ${{ steps.stock-check.outputs.online_status }}%0A"
-            message="${message}🕐 *Kontrol Zamanı:* ${timestamp}%0A%0A"
-            
-            # Add available stores
-            if [ ! -z "${{ steps.stock-check.outputs.stores_in_stock }}" ]; then
-              message="${message}� *Stokta Olan Mağazalar (${{ steps.stock-check.outputs.in_stock_count }}):*%0A"
-              IFS=',' read -ra STORES <<< "${{ steps.stock-check.outputs.stores_in_stock }}"
-              for store in "${STORES[@]}"; do
-                message="${message}   ✅ $store%0A"
-              done
-              message="${message}%0A"
-            fi
-            
-            # Add out of stock stores
-            if [ ! -z "${{ steps.stock-check.outputs.stores_out_of_stock }}" ]; then
-              message="${message}🔴 *Stokta Olmayan Mağazalar (${{ steps.stock-check.outputs.out_stock_count }}):*%0A"
-              IFS=',' read -ra STORES <<< "${{ steps.stock-check.outputs.stores_out_of_stock }}"
-              for store in "${STORES[@]}"; do
-                message="${message}   ❌ $store%0A"
-              done
-              message="${message}%0A"
-            fi
-            
-          else
-            message="😞 *IKEA Stok Kontrolü* 😞%0A%0A"
-            message="${message}📦 *Ürün Kodu:* 40573285%0A"
-            message="${message}📊 *Online Durum:* ${{ steps.stock-check.outputs.online_status }}%0A"
-            message="${message}🕐 *Kontrol Zamanı:* ${timestamp}%0A%0A"
-            message="${message}� *Hiçbir mağazada stok yok*%0A%0A"
             message="${message}💡 *İpucu:* Yarın tekrar kontrol edeceğim!"
           fi
           
