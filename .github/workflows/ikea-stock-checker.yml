@@ -1,11 +1,5 @@
 name: IKEA Stock Checker
-on:
-  schedule:
-    # Runs daily at 9:00 AM UTC (adjust timezone as needed)
-    - cron: '0 9 * * *'
-  # Allows manual trigger from GitHub Actions tab
-  workflow_dispatch:
-
+on: {}
 jobs:
   check-stock:
     runs-on: ubuntu-latest
