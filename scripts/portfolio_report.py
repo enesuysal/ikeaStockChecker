@@ -179,7 +179,7 @@ def main():
             send_telegram(error_msg)
         except requests.exceptions.RequestException:
             pass
-        raise
+        return
 
 
 if __name__ == "__main__":
