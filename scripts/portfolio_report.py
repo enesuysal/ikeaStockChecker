@@ -6,7 +6,7 @@ from datetime import datetime
 ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
-ROUTINE_TRIGGER_URL = os.environ.get("ROUTINE_TRIGGER_URL", "")
+ROUTINE_TRIGGER_URL = os.environ["ROUTINE_TRIGGER_URL"]
 
 PORTFOLIO_PROMPT = """
 Aşağıdaki portföyü analiz et ve Telegram için kısa özet rapor hazırla.
@@ -83,102 +83,37 @@ _Bilgi amaçlıdır, yatırım tavsiyesi değildir._
 """
 
 
-def call_claude_api(prompt):
-    """Claude API'ye direkt istek at"""
+def fire_routine(text):
+    """Claude Code routine'i tetikle"""
     headers = {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
+        "Authorization": f"Bearer {ANTHROPIC_API_KEY}",
         "anthropic-version": "2023-06-01",
+        "anthropic-beta": "experimental-cc-routine-2026-04-01",
+        "Content-Type": "application/json",
     }
 
-    payload = {
-        "model": "claude-sonnet-4-20250514",
-        "max_tokens": 2000,
-        "tools": [
-            {
-                "type": "web_search_20250305",
-                "name": "web_search",
-            }
-        ],
-        "messages": [{"role": "user", "content": prompt}],
-    }
+    payload = {"text": text}
 
     response = requests.post(
-        "https://api.anthropic.com/v1/messages",
+        ROUTINE_TRIGGER_URL,
         headers=headers,
         json=payload,
         timeout=120,
     )
 
     response.raise_for_status()
-    data = response.json()
-
-    # Tüm text bloklarını birleştir
-    result = ""
-    for block in data.get("content", []):
-        if block.get("type") == "text":
-            result += block.get("text", "")
-
-    return result.strip()
-
-
-def send_telegram(message):
-    """Telegram'a mesaj gönder"""
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-
-    payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": message,
-        "parse_mode": "Markdown",
-    }
-
-    response = requests.post(url, json=payload, timeout=30)
-    response.raise_for_status()
-    return response.json()
-
-
-def trigger_routine_if_configured():
-    """Opsiyonel routine trigger çağrısı"""
-    if not ROUTINE_TRIGGER_URL:
-        return
-
-    try:
-        response = requests.post(ROUTINE_TRIGGER_URL, timeout=30)
-        response.raise_for_status()
-    except requests.exceptions.RequestException as exc:
-        raise requests.exceptions.RequestException(
-            f"Routine trigger çağrısı başarısız oldu: {exc}"
-        ) from exc
 
 
 def main():
     print(f"[{datetime.now()}] Portföy analizi başlıyor...")
 
     try:
-        # Claude API'yi çağır
-        print("Claude API'ye istek gönderiliyor...")
-        analysis = call_claude_api(PORTFOLIO_PROMPT)
-
-        if not analysis:
-            raise ValueError("Claude'dan boş yanıt geldi")
-
-        print("Analiz tamamlandı, Telegram'a gönderiliyor...")
-
-        # Telegram'a gönder
-        send_telegram(analysis)
-
-        # Opsiyonel routine trigger
-        trigger_routine_if_configured()
-
-        print("✅ Telegram'a başarıyla gönderildi!")
+        print("Routine tetikleniyor...")
+        fire_routine(PORTFOLIO_PROMPT)
+        print("✅ Routine başarıyla tetiklendi!")
 
     except requests.exceptions.RequestException as e:
-        error_msg = f"❌ Portföy raporu hatası: {str(e)}"
-        print(error_msg)
-        try:
-            send_telegram(error_msg)
-        except requests.exceptions.RequestException:
-            pass
+        print(f"❌ Portföy raporu hatası: {str(e)}")
         return
 
 
