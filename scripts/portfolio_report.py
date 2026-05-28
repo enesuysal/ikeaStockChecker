@@ -142,8 +142,13 @@ def trigger_routine_if_configured():
     if not ROUTINE_TRIGGER_URL:
         return
 
-    response = requests.post(ROUTINE_TRIGGER_URL, timeout=30)
-    response.raise_for_status()
+    try:
+        response = requests.post(ROUTINE_TRIGGER_URL, timeout=30)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as exc:
+        raise requests.exceptions.RequestException(
+            f"Routine trigger çağrısı başarısız oldu: {exc}"
+        ) from exc
 
 
 def main():
